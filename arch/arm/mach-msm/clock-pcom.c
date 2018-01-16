@@ -151,7 +151,7 @@ static int msm_clock_pcom_probe(struct platform_device *pdev)
 		init.name = desc->name;
 		init.ops = &clk_ops_pcom;
 		init.num_parents = 0;
-		init.flags = CLK_IS_ROOT;
+		init.flags = 0;
 
 		if (!(p->flags & CLKFLAG_AUTO_OFF))
 			init.flags |= CLK_IGNORE_UNUSED;

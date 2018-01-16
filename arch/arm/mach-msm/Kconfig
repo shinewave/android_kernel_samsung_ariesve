@@ -77,6 +77,15 @@ config MACH_MSM7X30_SURF
 	help
 	  Support for the Qualcomm MSM7x30 SURF eval board.
 
+config MACH_ARIESVE
+	depends on ARCH_MSM7X30
+	depends on !MSM_STACKED_MEMORY
+	select APPSBOOT_3M_CONFIG
+	default n
+	bool "ARIESVE"
+	help
+	  Support for the Samsung Aries VE board.
+
 config MACH_QSD8X50_SURF
 	depends on ARCH_QSD8X50
 	bool "QSD8x50 SURF"
@@ -92,6 +101,9 @@ config MACH_QSD8X50A_ST1_5
 
 endmenu
 
+config APPSBOOT_3M_CONFIG
+	bool
+
 config MSM_SMD_PKG3
 	bool
 
@@ -106,4 +118,102 @@ config MSM_GPIOMUX
 	help
 	  Support for MSM V1 TLMM GPIOMUX architecture.
 
+config MSM_STACKED_MEMORY
+	bool "Stacked Memory"
+	default y
+	help
+	  This option is used to indicate the presence of on-die stacked
+	  memory.  When present this memory bank is used for a high speed
+	  shared memory interface.  When not present regular RAM is used.
+
+config PHYS_OFFSET
+	hex
+	default "0x40800000" if ARCH_MSM9615
+	default "0x80200000" if ARCH_APQ8064
+	default "0x80200000" if ARCH_MSM8960
+	default "0x80200000" if ARCH_MSM8930
+	default "0x00000000" if ARCH_MSM8974
+	default "0x00000000" if ARCH_MPQ8092
+	default "0x00000000" if ARCH_MSM8226
+	default "0x10000000" if ARCH_FSM9XXX
+	default "0x20200000" if ARCH_MSM9625
+	default "0x00200000" if !MSM_STACKED_MEMORY && !APPSBOOT_3M_CONFIG
+	default "0x00400000" if !MSM_STACKED_MEMORY && APPSBOOT_3M_CONFIG
+	default "0x00000000" if ARCH_QSD8X50 && MSM_SOC_REV_A
+	default "0x20000000" if ARCH_QSD8X50
+	default "0x40200000" if ARCH_MSM8X60
+	default "0x10000000"
+
+config MSM_ADSP
+	depends on (ARCH_MSM7X01A || ARCH_MSM7X25 || ARCH_MSM7X27)
+	tristate "MSM ADSP driver"
+	depends on ANDROID_PMEM
+	default y
+	help
+	  Provides access to registers needed by the userspace aDSP library.
+
+config ADSP_RPC_VER
+	hex
+	default 0x30002 if (ARCH_MSM7X27 || (ARCH_MSM7X25 && AMSS_7X25_VERSION_2009))
+	default 0x30001 if (ARCH_MSM7X01A || (ARCH_MSM7X25 && AMSS_7X25_VERSION_2008))
+	depends on MSM_ADSP
+	help
+	  Select proper ADSP RPC version
+
+choice
+	prompt "ADSP RPC version"
+
+	default AMSS_7X25_VERSION_2009
+
+	config AMSS_7X25_VERSION_2009
+	        bool "2.0.09"
+
+	config AMSS_7X25_VERSION_2008
+	        bool "2.0.08"
+endchoice
+
+config MSM7KV2_AUDIO
+	bool "MSM7K v2 audio"
+	depends on ARCH_MSM7X30
+	default y
+	help
+	  Enables QDSP5V2-based audio drivers for audio playbacks and
+	  voice call.
+
+config MSM_ADSP_REPORT_EVENTS
+	bool "Report modem events from the DSP"
+	default y
+	depends on (MSM_ADSP || MSM7KV2_AUDIO)
+	help
+	  Normally, only messages from the aDSP are reported to userspace.
+	  With this option, we report events from the aDSP as well.
+
+config MSM_QDSP6
+	tristate "QDSP6 support"
+	depends on ARCH_QSD8X50 && ANDROID_PMEM
+	default y
+	help
+	  Enable support for qdsp6. This provides audio and video functionality.
+       
 endif
+
+config QSD_AUDIO
+	bool "QSD audio"
+	depends on ARCH_MSM_SCORPION && MSM_DALRPC && ANDROID_PMEM && !MSM_SMP
+	default y
+	help
+	  Provides PCM, MP3, and AAC audio playback.
+
+config AUDIO_AAC_PLUS
+	depends on (MSM_ADSP || QSD_AUDIO || MSM7KV2_AUDIO)
+	bool "AAC+ Audio"
+	default y
+	help
+	  Provides AAC+ decoding
+
+config AUDIO_ENHANCED_AAC_PLUS
+	depends on AUDIO_AAC_PLUS
+	bool "Enhanced AAC+ Audio"
+	default y
+	help
+	  Provides Enhanced AAC+ decoding

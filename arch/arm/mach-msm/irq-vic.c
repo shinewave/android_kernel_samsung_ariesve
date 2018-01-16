@@ -313,11 +313,11 @@ static int msm_irq_set_type(struct irq_data *d, unsigned int flow_type)
 	type = msm_irq_shadow_reg[index].int_type;
 	if (flow_type & (IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING)) {
 		type |= b;
-		__irq_set_handler_locked(d->irq, handle_edge_irq);
+		irq_set_handler_locked(d, handle_edge_irq);
 	}
 	if (flow_type & (IRQF_TRIGGER_HIGH | IRQF_TRIGGER_LOW)) {
 		type &= ~b;
-		__irq_set_handler_locked(d->irq, handle_level_irq);
+		irq_set_handler_locked(d, handle_level_irq);
 	}
 	writel(type, treg);
 	msm_irq_shadow_reg[index].int_type = type;
@@ -358,6 +358,6 @@ void __init msm_init_irq(void)
 
 	for (n = 0; n < NR_MSM_IRQS; n++) {
 		irq_set_chip_and_handler(n, &msm_irq_chip, handle_level_irq);
-		set_irq_flags(n, IRQF_VALID);
+		irq_clear_status_flags(n, IRQ_NOREQUEST);
 	}
 }

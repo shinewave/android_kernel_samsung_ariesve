@@ -8,12 +8,11 @@ obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
 obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
 
 obj-$(CONFIG_ARCH_MSM7X00A) += dma.o io.o
-obj-$(CONFIG_ARCH_MSM7X30) += dma.o io.o
+obj-$(CONFIG_ARCH_MSM7X30) += dma.o io.o memory.o
 obj-$(CONFIG_ARCH_QSD8X50) += dma.o io.o
 
 obj-$(CONFIG_MSM_ADSP) += qdsp5/
 obj-$(CONFIG_MSM7KV2_AUDIO) += qdsp5v2/
-obj-$(CONFIG_MSM_QDSP6) += qdsp6/
 
 obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
 obj-$(CONFIG_MSM_SMD) += last_radio_log.o

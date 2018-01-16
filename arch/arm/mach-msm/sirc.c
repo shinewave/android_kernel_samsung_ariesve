@@ -105,10 +105,10 @@ static int sirc_irq_set_type(struct irq_data *d, unsigned int flow_type)
 	val = readl(sirc_regs.int_type);
 	if (flow_type & (IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING)) {
 		val |= mask;
-		__irq_set_handler_locked(d->irq, handle_edge_irq);
+		irq_set_handler_locked(d, handle_edge_irq);
 	} else {
 		val &= ~mask;
-		__irq_set_handler_locked(d->irq, handle_level_irq);
+		irq_set_handler_locked(d, handle_level_irq);
 	}
 
 	writel(val, sirc_regs.int_type);
@@ -159,7 +159,7 @@ void __init msm_init_sirc(void)
 
 	for (i = FIRST_SIRC_IRQ; i < LAST_SIRC_IRQ; i++) {
 		irq_set_chip_and_handler(i, &sirc_irq_chip, handle_edge_irq);
-		set_irq_flags(i, IRQF_VALID);
+		irq_clear_status_flags(i, IRQ_NOREQUEST);
 	}
 
 	for (i = 0; i < ARRAY_SIZE(sirc_reg_table); i++) {
