@@ -552,6 +552,7 @@ config ARCH_PXA
 	help
 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
 
+
 config ARCH_QCOM
        bool "Qualcomm MSM (non-multiplatform)"
        select GPIOLIB
@@ -579,6 +580,41 @@ config ARCH_QCOM
          interface to the modem processor which runs the baseband
          stack and controls some vital subsystems
          (clock and power control, etc).
+
+config ARCH_MSM
+	bool "Qualcomm MSM (non-multiplatform)"
+	select ARCH_REQUIRE_GPIOLIB
+	select COMMON_CLK
+	select GENERIC_CLOCKEVENTS
+	help
+	  Support for Qualcomm MSM/QSD based systems.  This runs on the
+	  apps processor of the MSM/QSD and depends on a shared memory
+	  interface to the modem processor which runs the baseband
+	  stack and controls some vital subsystems
+	  (clock and power control, etc).
+
+config ARCH_SHMOBILE_LEGACY
+	bool "Renesas ARM SoCs (non-multiplatform)"
+	select ARCH_SHMOBILE
+	select ARM_PATCH_PHYS_VIRT if MMU
+	select CLKDEV_LOOKUP
+	select CPU_V7
+	select GENERIC_CLOCKEVENTS
+	select HAVE_ARM_SCU if SMP
+	select HAVE_ARM_TWD if SMP
+	select HAVE_MACH_CLKDEV
+	select HAVE_SMP
+	select MIGHT_HAVE_CACHE_L2X0
+	select MULTI_IRQ_HANDLER
+	select NO_IOPORT_MAP
+	select PINCTRL
+	select PM_GENERIC_DOMAINS if PM
+	select SH_CLK_CPG
+	select SPARSE_IRQ
+	help
+	  Support for Renesas ARM SoC platforms using a non-multiplatform
+	  kernel. This includes the SH-Mobile, R-Mobile, EMMA-Mobile, R-Car
+	  and RZ families.
 
 config ARCH_RPC
 	bool "RiscPC"
@@ -794,6 +830,8 @@ source "arch/arm/mach-keystone/Kconfig"
 source "arch/arm/mach-ks8695/Kconfig"
 
 source "arch/arm/mach-meson/Kconfig"
+
+source "arch/arm/mach-msm/Kconfig"
 
 source "arch/arm/mach-moxart/Kconfig"
 
