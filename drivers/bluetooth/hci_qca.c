@@ -31,6 +31,10 @@
 #include <linux/kernel.h>
 #include <linux/debugfs.h>
 
+#ifdef CONFIG_SERIAL_MSM_HS
+#include <linux/platform_data/msm_serial_hs.h>
+#endif
+
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
 
@@ -117,6 +121,12 @@ static void __serial_clock_on(struct tty_struct *tty)
 	 * side to save power consumption or manual work is required.
 	 * Please put your code to control UART clock here if needed
 	 */
+#ifdef CONFIG_SERIAL_MSM_HS
+	struct uart_state *state = tty->driver_data;
+	struct uart_port *port = state->uart_port;
+
+	msm_hs_request_clock_on(port);
+#endif
 }
 
 static void __serial_clock_off(struct tty_struct *tty)
@@ -125,6 +135,12 @@ static void __serial_clock_off(struct tty_struct *tty)
 	 * side to save power consumption or manual work is required.
 	 * Please put your code to control UART clock off here if needed
 	 */
+#ifdef CONFIG_SERIAL_MSM_HS
+	struct uart_state *state = tty->driver_data;
+	struct uart_port *port = state->uart_port;
+
+	msm_hs_request_clock_off(port);
+#endif
 }
 
 /* serial_clock_vote needs to be called with the ibs lock held */
