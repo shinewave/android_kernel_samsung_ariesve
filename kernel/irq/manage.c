@@ -633,6 +633,31 @@ int irq_set_irq_wake(unsigned int irq, unsigned int on)
 }
 EXPORT_SYMBOL(irq_set_irq_wake);
 
+/**
+ *	irq_read_line - read the value on an irq line
+ *	@irq: Interrupt number to read
+ *
+ *	This function may be called from IRQ context only when
+ *	desc->chip->bus_lock and desc->chip->bus_sync_unlock are NULL !
+ */
+int irq_read_line(unsigned int irq)
+{
+	struct irq_desc *desc;
+	unsigned long flags;
+	int ret = -ENOSYS;
+
+	desc = irq_get_desc_buslock(irq, &flags, IRQ_GET_DESC_CHECK_GLOBAL);
+	if (!desc)
+	return -EINVAL;
+
+	if (desc->irq_data.chip->irq_read_line)
+	ret = desc->irq_data.chip->irq_read_line(&desc->irq_data);
+
+	irq_put_desc_busunlock(desc, flags);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(irq_read_line);
+
 /*
  * Internal function that tells the architecture code whether a
  * particular irq has been exclusively allocated or is available

@@ -390,6 +390,8 @@ static inline int disable_irq_wake(unsigned int irq)
 	return irq_set_irq_wake(irq, 0);
 }
 
+extern int irq_read_line(unsigned int irq);
+
 /*
  * irq_get_irqchip_state/irq_set_irqchip_state specific flags
  */
