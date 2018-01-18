@@ -313,6 +313,14 @@ config GPIO_MPC8XXX
 	  Say Y here if you're going to use hardware that connects to the
 	  MPC512x/831x/834x/837x/8572/8610/QorIQ GPIOs.
 
+config GPIO_MSM_V1
+	tristate "Qualcomm MSM GPIO v1"
+	depends on GPIOLIB && ARCH_MSM
+	help
+	  Say yes here to support the GPIO interface on ARM v6 based
+	  Qualcomm MSM chips.  Most of the pins on the MSM can be
+	  selected for GPIO, and are controlled by this driver.
+
 config GPIO_MVEBU
 	def_bool y
 	depends on PLAT_ORION
@@ -957,6 +965,29 @@ config GPIO_PALMAS
 	help
 	  Select this option to enable GPIO driver for the TI PALMAS
 	  series chip family.
+
+config GPIO_PM8XXX
+	tristate "Qualcomm PM8xxx GPIO support"
+	depends on MFD_PM8XXX
+	default y if MFD_PM8XXX
+	help
+	  This option enables support for on-chip GPIO found on Qualcomm PM8xxx
+	  PMICs.
+
+config GPIO_PM8XXX_MPP
+	tristate "Support for Qualcomm PM8xxx MPP features"
+	depends on MFD_PM8XXX
+	default y if MFD_PM8XXX
+	help
+	  This is the multi-purpose pin (MPP) driver for Qualcomm PM 8xxx PMIC
+	  chips.
+
+config GPIO_PM8XXX_RPC
+	tristate "Qualcomm PM8xxx RPC based GPIO support"
+	depends on MSM_SMD
+	help
+	  This option enables support for on-chip GPIO found on Qualcomm PM8xxx
+	  PMICs through RPC.
 
 config GPIO_RC5T583
 	bool "RICOH RC5T583 GPIO"

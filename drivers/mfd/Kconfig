@@ -755,8 +755,37 @@ config UCB1400_CORE
 	  To compile this driver as a module, choose M here: the
 	  module will be called ucb1400_core.
 
+config MARIMBA_CORE
+	tristate "Marimba Core"
+	depends on I2C && (ARCH_MSM7X30 || ARCH_MSM8X60 || ARCH_MSM7X27A)
+	default n
+	help
+	  Enables the Marimba Core driver. The core driver provides
+	  read/write capability to registers which are part of the
+	  marimba core.
+	  This driver dynamically detects the SoC and works for both
+	  Marimba and Bahama Chip.
+
+config MARIMBA_CODEC
+	tristate "Marimba Codec"
+	depends on MARIMBA_CORE
+	default n
+	help
+	 This driver programs Marimba Wideband Codec for input/output of
+	 audio signal.
+
 config MFD_PM8XXX
 	tristate
+
+config MFD_PM8XXX_IRQ
+	bool "Support for Qualcomm PM8xxx IRQ features"
+	depends on MFD_PM8XXX
+	default y if MFD_PM8XXX
+	help
+	  This is the IRQ driver for Qualcomm PM 8xxx PMIC chips.
+
+	  This is required to use certain other PM 8xxx features, such as GPIO
+	  and MPP.
 
 config MFD_PM8921_CORE
 	tristate "Qualcomm PM8921 PMIC chip"
@@ -774,6 +803,13 @@ config MFD_PM8921_CORE
 
 	  Say M here if you want to include support for PM8921 chip as a module.
 	  This will build a module called "pm8921-core".
+
+config PMIC8058
+	tristate "PMIC8058 Power Management chip"
+	select MFD_CORE
+	select MFD_PM8XXX
+	help
+	  Say yes here for Qualcomm PM8058 chip.
 
 config MFD_I2C_PMIC
 	tristate "QTI I2C PMIC support"
