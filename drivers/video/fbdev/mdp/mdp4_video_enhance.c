@@ -37,9 +37,9 @@
 
 #include "mdp4_video_enhance.h"
 #include "mdp4_video_tuning.h"
-#include "msm_fb.h"
-#include "mdp.h"
-#include "mdp4.h"
+#include <video/msm_fb.h>
+#include <video/mdp/mdp.h>
+#include <video/mdp/mdp4.h>
 
 #define MDP4_VIDEO_ENHANCE_TUNING
 #define VIDEO_ENHANCE_DEBUG
@@ -292,7 +292,6 @@ void free_cmap(struct fb_cmap *cmap)
 
 void lut_tune(int num, unsigned int *pLutTable )
 {
-			printk(KERN_ERR"[mDNIE WARNING] LUT TUNE PASSATO\n");
 //	int fb;
 	struct fb_info *info;
 	struct fb_cmap test_cmap;
@@ -303,6 +302,7 @@ void lut_tune(int num, unsigned int *pLutTable )
 //	fb = open("/dev/graphics/fb0", O_RDWR);
 	__u16 *r, *g, *b, i;
 	int j = 0;
+			printk(KERN_ERR"[mDNIE WARNING] LUT TUNE PASSATO\n");
 	
 	info = registered_fb[0];
 	cmap = &test_cmap;

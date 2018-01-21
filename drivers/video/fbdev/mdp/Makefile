@@ -48,4 +48,18 @@ obj-$(CONFIG_ARCH_MSM7X27A) += msm_dss_io_7x27a.o
 obj-$(CONFIG_ARCH_MSM8X60) += msm_dss_io_8x60.o
 obj-$(CONFIG_ARCH_MSM8960) += msm_dss_io_8960.o
 
+# LCDC
+obj-$(CONFIG_FB_MSM_LCDC) += lcdc.o
+
+# TVEnc
+obj-$(CONFIG_FB_MSM_TVOUT) += tvenc.o
+ifeq ($(CONFIG_FB_MSM_OVERLAY),y)
+obj-$(CONFIG_FB_MSM_TVOUT) += mdp4_overlay_atv.o
+endif
+
+obj-$(CONFIG_FB_MSM_LCDC_PANEL) += lcdc_panel.o
+obj-$(CONFIG_FB_MSM_LCDC_S6E63M0_WVGA) += lcdc_s6e63m0.o
+
+obj-$(CONFIG_FB_MSM_TVOUT) += tvout_msm.o
+
 endif
