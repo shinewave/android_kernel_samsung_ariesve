@@ -350,6 +350,18 @@ static inline unsigned long __virt_to_idmap(unsigned long x)
 
 #endif
 
+/*
+ * Optional coherency support.  Currently used only by selected
+ * Intel XSC3-based systems.
+ */
+#ifndef arch_is_coherent
+#define arch_is_coherent()		0
+#endif
+
+#if defined CONFIG_ARCH_MSM_SCORPION || defined CONFIG_ARCH_MSM_KRAIT
+#define arch_has_speculative_dfetch()	1
+#endif
+
 #include <asm-generic/memory_model.h>
 
 #endif

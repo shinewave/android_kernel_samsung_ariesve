@@ -47,6 +47,13 @@ config LOGO_MAC_CLUT224
 	depends on MAC
 	default y
 
+config FB_MSM_LOGO
+	bool "MSM Frame Buffer Logo"
+	depends on FB_MSM
+	default n
+	---help---
+	  Show /initlogo.rle during boot.
+
 config LOGO_PARISC_CLUT224
 	bool "224-color PA-RISC Linux logo"
 	depends on PARISC

@@ -255,6 +255,26 @@ config FB_CIRRUS
 	  Say N unless you have such a graphics board or plan to get one
 	  before you next recompile the kernel.
 
+
+config FB_MSM
+	tristate "MSM Framebuffer support"
+	depends on FB && ARCH_MSM
+	select FB_BACKLIGHT if FB_MSM_BACKLIGHT
+	select NEW_LEDS
+	select LEDS_CLASS
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	---help---
+	  Support for MSM Framebuffer.
+
+config FB_MSM_TRIPLE_BUFFER
+	bool "Support for triple frame buffer"
+	depends on FB_MSM
+	default n
+
+source "drivers/video/fbdev/mdp/Kconfig"
+
 config FB_PM2
 	tristate "Permedia2 support"
 	depends on FB && ((AMIGA && BROKEN) || PCI)

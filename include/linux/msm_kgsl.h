@@ -10,4 +10,13 @@ int kgsl_pwr_limits_set_freq(void *limit, unsigned int freq);
 void kgsl_pwr_limits_set_default(void *limit);
 unsigned int kgsl_pwr_limits_get_freq(enum kgsl_deviceid id);
 
+#ifdef __KERNEL__
+#ifdef CONFIG_MSM_KGSL_DRM
+int kgsl_gem_obj_addr(int drm_fd, int handle, unsigned long *start,
+			unsigned long *len);
+#else
+#define kgsl_gem_obj_addr(...) 0
+#endif
+#endif
+
 #endif /* _MSM_KGSL_H */

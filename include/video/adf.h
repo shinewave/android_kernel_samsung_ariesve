@@ -30,7 +30,7 @@
 #include <linux/wait.h>
 #include <linux/workqueue.h>
 #include <uapi/video/adf.h>
-#include "sync.h"
+#include <linux/sync.h>
 
 struct adf_obj;
 struct adf_obj_ops;

@@ -1,0 +1,51 @@
+ifeq ($(CONFIG_FB_MSM_MDP_HW),y)
+# MDP
+obj-y += mdp.o
+
+obj-$(CONFIG_DEBUG_FS) += mdp_debugfs.o
+
+ifeq ($(CONFIG_FB_MSM_MDP40),y)
+obj-y += mdp4_util.o
+ifeq ($(CONFIG_FB_MSM_LCDC_S6E63M0_WVGA),y)
+obj-y += mdp4_video_enhance.o
+endif
+else
+obj-y += mdp_hw_init.o
+obj-y += mdp_ppp.o
+ifeq ($(CONFIG_FB_MSM_MDP31),y)
+obj-y += mdp_ppp_v31.o
+else
+obj-y += mdp_ppp_v20.o
+endif
+endif
+
+ifeq ($(CONFIG_FB_MSM_OVERLAY),y)
+obj-y += mdp4_overlay.o
+obj-y += mdp4_overlay_lcdc.o
+ifeq ($(CONFIG_FB_MSM_MIPI_DSI),y)
+obj-y += mdp4_overlay_dsi_video.o
+obj-y += mdp4_overlay_dsi_cmd.o
+else
+obj-y += mdp4_overlay_mddi.o
+endif
+else
+obj-y += mdp_dma_lcdc.o
+endif
+
+obj-$(CONFIG_FB_MSM_MDP303) += mdp_dma_dsi_video.o
+
+ifeq ($(CONFIG_FB_MSM_DTV),y)
+obj-y += mdp4_dtv.o
+obj-y += mdp4_overlay_dtv.o
+endif
+
+obj-y += mdp_dma.o
+obj-y += mdp_dma_s.o
+obj-y += mdp_vsync.o
+obj-y += mdp_cursor.o
+obj-y += mdp_dma_tv.o
+obj-$(CONFIG_ARCH_MSM7X27A) += msm_dss_io_7x27a.o
+obj-$(CONFIG_ARCH_MSM8X60) += msm_dss_io_8x60.o
+obj-$(CONFIG_ARCH_MSM8960) += msm_dss_io_8960.o
+
+endif
