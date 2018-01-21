@@ -154,6 +154,63 @@ static inline void ion_buffer_page_clean(struct page **page)
 	*page = (struct page *)((unsigned long)(*page) & ~(1UL));
 }
 
+static void ion_iommu_release(struct kref *kref);
+
+static void ion_iommu_add(struct ion_buffer *buffer,
+			  struct ion_iommu_map *iommu)
+{
+	struct rb_node **p = &buffer->iommu_maps.rb_node;
+	struct rb_node *parent = NULL;
+	struct ion_iommu_map *entry;
+
+	while (*p) {
+		parent = *p;
+		entry = rb_entry(parent, struct ion_iommu_map, node);
+
+		if (iommu->key < entry->key) {
+			p = &(*p)->rb_left;
+		} else if (iommu->key > entry->key) {
+			p = &(*p)->rb_right;
+		} else {
+			pr_err("%s: buffer %p already has mapping for domain %d"
+				" and partition %d\n", __func__,
+				buffer,
+				iommu_map_domain(iommu),
+				iommu_map_partition(iommu));
+			BUG();
+		}
+	}
+
+	rb_link_node(&iommu->node, parent, p);
+	rb_insert_color(&iommu->node, &buffer->iommu_maps);
+
+}
+
+static struct ion_iommu_map *ion_iommu_lookup(struct ion_buffer *buffer,
+						unsigned int domain_no,
+						unsigned int partition_no)
+{
+	struct rb_node **p = &buffer->iommu_maps.rb_node;
+	struct rb_node *parent = NULL;
+	struct ion_iommu_map *entry;
+	uint64_t key = domain_no;
+	key = key << 32 | partition_no;
+
+	while (*p) {
+		parent = *p;
+		entry = rb_entry(parent, struct ion_iommu_map, node);
+
+		if (key < entry->key)
+			p = &(*p)->rb_left;
+		else if (key > entry->key)
+			p = &(*p)->rb_right;
+		else
+			return entry;
+	}
+
+	return NULL;
+}
+
 /* this function should only be called while dev->lock is held */
 static void ion_buffer_add(struct ion_device *dev,
 			   struct ion_buffer *buffer)
@@ -805,6 +862,184 @@ static void ion_handle_kmap_put(struct ion_handle *handle)
 	if (!handle->kmap_cnt)
 		ion_buffer_kmap_put(buffer);
 }
+
+static struct ion_iommu_map *__ion_iommu_map(struct ion_buffer *buffer,
+		int domain_num, int partition_num, unsigned long align,
+		unsigned long iova_length, unsigned long flags,
+		ion_phys_addr_t *iova)
+{
+	struct ion_iommu_map *data;
+	int ret;
+
+	data = kmalloc(sizeof(*data), GFP_ATOMIC);
+
+	if (!data)
+		return ERR_PTR(-ENOMEM);
+
+	data->buffer = buffer;
+	iommu_map_domain(data) = domain_num;
+	iommu_map_partition(data) = partition_num;
+
+	ret = buffer->heap->ops->map_iommu(buffer, data,
+						domain_num,
+						partition_num,
+						align,
+						iova_length,
+						flags);
+
+	if (ret)
+		goto out;
+
+	kref_init(&data->ref);
+	*iova = data->iova_addr;
+
+	ion_iommu_add(buffer, data);
+
+	return data;
+
+out:
+	kfree(data);
+	return ERR_PTR(ret);
+}
+
+int ion_map_iommu(struct ion_client *client, struct ion_handle *handle,
+			int domain_num, int partition_num, unsigned long align,
+			unsigned long iova_length, ion_phys_addr_t *iova,
+			size_t *buffer_size,
+			unsigned long flags, unsigned long iommu_flags)
+{
+	struct ion_buffer *buffer;
+	struct ion_iommu_map *iommu_map;
+	int ret = 0;
+
+	if (ION_IS_CACHED(flags)) {
+		pr_err("%s: Cannot map iommu as cached.\n", __func__);
+		return -EINVAL;
+	}
+
+	mutex_lock(&client->lock);
+	if (!ion_handle_validate(client, handle)) {
+		pr_err("%s: invalid handle passed to map_kernel.\n",
+		       __func__);
+		mutex_unlock(&client->lock);
+		return -EINVAL;
+	}
+
+	buffer = handle->buffer;
+	mutex_lock(&buffer->lock);
+
+	if (!handle->buffer->heap->ops->map_iommu) {
+		pr_err("%s: map_iommu is not implemented by this heap.\n",
+		       __func__);
+		ret = -ENODEV;
+		goto out;
+	}
+
+	/*
+	 * If clients don't want a custom iova length, just use whatever
+	 * the buffer size is
+	 */
+	if (!iova_length)
+		iova_length = buffer->size;
+
+	if (buffer->size > iova_length) {
+		pr_debug("%s: iova length %lx is not at least buffer size"
+			" %x\n", __func__, iova_length, buffer->size);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (buffer->size & ~PAGE_MASK) {
+		pr_debug("%s: buffer size %x is not aligned to %lx", __func__,
+			buffer->size, PAGE_SIZE);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (iova_length & ~PAGE_MASK) {
+		pr_debug("%s: iova_length %lx is not aligned to %lx", __func__,
+			iova_length, PAGE_SIZE);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	iommu_map = ion_iommu_lookup(buffer, domain_num, partition_num);
+	if (!iommu_map) {
+		iommu_map = __ion_iommu_map(buffer, domain_num, partition_num,
+					    align, iova_length, flags, iova);
+		if (!IS_ERR_OR_NULL(iommu_map)) {
+			iommu_map->flags = iommu_flags;
+
+			if (iommu_map->flags & ION_IOMMU_UNMAP_DELAYED)
+				kref_get(&iommu_map->ref);
+		}
+	} else {
+		if (iommu_map->flags != iommu_flags) {
+			pr_err("%s: handle %p is already mapped with iommu flags %lx, trying to map with flags %lx\n",
+				__func__, handle,
+				iommu_map->flags, iommu_flags);
+			ret = -EINVAL;
+		} else if (iommu_map->mapped_size != iova_length) {
+			pr_err("%s: handle %p is already mapped with length"
+					" %x, trying to map with length %lx\n",
+				__func__, handle, iommu_map->mapped_size,
+				iova_length);
+			ret = -EINVAL;
+		} else {
+			kref_get(&iommu_map->ref);
+			*iova = iommu_map->iova_addr;
+		}
+	}
+	if (!ret)
+		buffer->iommu_map_cnt++;
+	*buffer_size = buffer->size;
+out:
+	mutex_unlock(&buffer->lock);
+	mutex_unlock(&client->lock);
+	return ret;
+}
+EXPORT_SYMBOL(ion_map_iommu);
+
+static void ion_iommu_release(struct kref *kref)
+{
+	struct ion_iommu_map *map = container_of(kref, struct ion_iommu_map,
+						ref);
+	struct ion_buffer *buffer = map->buffer;
+
+	rb_erase(&map->node, &buffer->iommu_maps);
+	buffer->heap->ops->unmap_iommu(map);
+	kfree(map);
+}
+
+void ion_unmap_iommu(struct ion_client *client, struct ion_handle *handle,
+			int domain_num, int partition_num)
+{
+	struct ion_iommu_map *iommu_map;
+	struct ion_buffer *buffer;
+
+	mutex_lock(&client->lock);
+	buffer = handle->buffer;
+
+	mutex_lock(&buffer->lock);
+
+	iommu_map = ion_iommu_lookup(buffer, domain_num, partition_num);
+
+	if (!iommu_map) {
+		WARN(1, "%s: (%d,%d) was never mapped for %p\n", __func__,
+				domain_num, partition_num, buffer);
+		goto out;
+	}
+
+	kref_put(&iommu_map->ref, ion_iommu_release);
+
+	buffer->iommu_map_cnt--;
+out:
+	mutex_unlock(&buffer->lock);
+
+	mutex_unlock(&client->lock);
+
+}
+EXPORT_SYMBOL(ion_unmap_iommu);
 
 void *ion_map_kernel(struct ion_client *client, struct ion_handle *handle)
 {
@@ -2049,6 +2284,60 @@ int ion_walk_heaps(struct ion_client *client, int heap_id,
 	return ret_val;
 }
 EXPORT_SYMBOL(ion_walk_heaps);
+
+int ion_secure_heap(struct ion_device *dev, int heap_id, int version,
+			void *data)
+{
+	struct ion_heap *heap;
+	int ret_val = 0;
+
+	/*
+	 * traverse the list of heaps available in this system
+	 * and find the heap that is specified.
+	 */
+	down_write(&dev->lock);
+	plist_for_each_entry(heap, &dev->heaps, node) {
+		if (heap->type != (enum ion_heap_type) ION_HEAP_TYPE_CP)
+			continue;
+		if (ION_HEAP(heap->id) != heap_id)
+			continue;
+		if (heap->ops->secure_heap)
+			ret_val = heap->ops->secure_heap(heap, version, data);
+		else
+			ret_val = -EINVAL;
+		break;
+	}
+	up_write(&dev->lock);
+	return ret_val;
+}
+EXPORT_SYMBOL(ion_secure_heap);
+
+int ion_unsecure_heap(struct ion_device *dev, int heap_id, int version,
+			void *data)
+{
+	struct ion_heap *heap;
+	int ret_val = 0;
+
+	/*
+	 * traverse the list of heaps available in this system
+	 * and find the heap that is specified.
+	 */
+	down_write(&dev->lock);
+	plist_for_each_entry(heap, &dev->heaps, node) {
+		if (heap->type != (enum ion_heap_type) ION_HEAP_TYPE_CP)
+			continue;
+		if (ION_HEAP(heap->id) != heap_id)
+			continue;
+		if (heap->ops->secure_heap)
+			ret_val = heap->ops->unsecure_heap(heap, version, data);
+		else
+			ret_val = -EINVAL;
+		break;
+	}
+	up_write(&dev->lock);
+	return ret_val;
+}
+EXPORT_SYMBOL(ion_unsecure_heap);
 
 struct ion_device *ion_device_create(long (*custom_ioctl)
 				     (struct ion_client *client,

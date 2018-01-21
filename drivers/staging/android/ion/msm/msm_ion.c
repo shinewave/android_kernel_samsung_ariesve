@@ -36,6 +36,7 @@
 #include <asm/cacheflush.h>
 #include "../ion_priv.h"
 #include "compat_msm_ion.h"
+#include "ion_cp_common.h"
 #include <soc/qcom/secure_buffer.h>
 
 #define ION_COMPAT_STR	"qcom,msm-ion"
@@ -152,6 +153,18 @@ struct ion_client *msm_ion_client_create(const char *name)
 	return ion_client_create(idev, name);
 }
 EXPORT_SYMBOL(msm_ion_client_create);
+
+int msm_ion_secure_heap(int heap_id)
+{
+	return ion_secure_heap(idev, heap_id, ION_CP_V1, NULL);
+}
+EXPORT_SYMBOL(msm_ion_secure_heap);
+
+int msm_ion_unsecure_heap(int heap_id)
+{
+	return ion_unsecure_heap(idev, heap_id, ION_CP_V1, NULL);
+}
+EXPORT_SYMBOL(msm_ion_unsecure_heap);
 
 static int ion_no_pages_cache_ops(
 			struct ion_client *client,

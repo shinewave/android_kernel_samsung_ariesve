@@ -10,6 +10,8 @@ enum msm_ion_heap_types {
 	ION_HEAP_TYPE_SECURE_DMA = ION_HEAP_TYPE_MSM_START,
 	ION_HEAP_TYPE_SYSTEM_SECURE,
 	ION_HEAP_TYPE_HYP_CMA,
+	ION_HEAP_TYPE_IOMMU,
+	ION_HEAP_TYPE_CP,
 	/*
 	 * if you add a heap type here you should also add it to
 	 * heap_types_info[] in msm_ion.c
@@ -139,6 +141,43 @@ enum cp_mem_usage {
 #define ION_SET_UNCACHED(__cache)	((__cache) & ~ION_FLAG_CACHED)
 
 #define ION_IS_CACHED(__flags)	((__flags) & ION_FLAG_CACHED)
+
+#ifdef __KERNEL__
+
+#ifdef CONFIG_ION
+/**
+ * msm_ion_secure_heap - secure a heap. Wrapper around ion_secure_heap.
+ *
+  * @heap_id - heap id to secure.
+ *
+ * Secure a heap
+ * Returns 0 on success
+ */
+int msm_ion_secure_heap(int heap_id);
+
+/**
+ * msm_ion_unsecure_heap - unsecure a heap. Wrapper around ion_unsecure_heap.
+ *
+  * @heap_id - heap id to secure.
+ *
+ * Un-secure a heap
+ * Returns 0 on success
+ */
+int msm_ion_unsecure_heap(int heap_id);
+#else
+static inline int msm_ion_secure_heap(int heap_id)
+{
+	return -ENODEV;
+
+}
+
+static inline int msm_ion_unsecure_heap(int heap_id)
+{
+	return -ENODEV;
+}
+#endif /* CONFIG_ION */
+
+#endif /* __KERNEL */
 
 /* struct ion_flush_data - data passed to ion for flushing caches
  *

@@ -36,6 +36,42 @@
 
 #include "ion.h"
 
+enum {
+	DI_PARTITION_NUM = 0,
+	DI_DOMAIN_NUM = 1,
+	DI_MAX,
+};
+
+/**
+ * struct ion_iommu_map - represents a mapping of an ion buffer to an iommu
+ * @iova_addr - iommu virtual address
+ * @node - rb node to exist in the buffer's tree of iommu mappings
+ * @domain_info - contains the partition number and domain number
+ *		domain_info[1] = domain number
+ *		domain_info[0] = partition number
+ * @ref - for reference counting this mapping
+ * @mapped_size - size of the iova space mapped
+ *		(may not be the same as the buffer size)
+ * @flags - iommu domain/partition specific flags.
+ *
+ * Represents a mapping of one ion buffer to a particular iommu domain
+ * and address range. There may exist other mappings of this buffer in
+ * different domains or address ranges. All mappings will have the same
+ * cacheability and security.
+ */
+struct ion_iommu_map {
+	unsigned long iova_addr;
+	struct rb_node node;
+	union {
+		int domain_info[DI_MAX];
+		uint64_t key;
+	};
+	struct ion_buffer *buffer;
+	struct kref ref;
+	int mapped_size;
+	unsigned long flags;
+};
+
 struct ion_buffer *ion_handle_buffer(struct ion_handle *handle);
 
 /**
@@ -106,6 +142,8 @@ struct ion_buffer {
 	struct sg_table *sg_table;
 	struct page **pages;
 	struct list_head vmas;
+	unsigned int iommu_map_cnt;
+	struct rb_root iommu_maps;
 	/* used to track orphaned buffers */
 	int handle_count;
 	char task_comm[TASK_COMM_LEN];
@@ -153,8 +191,18 @@ struct ion_heap_ops {
 			struct vm_area_struct *vma);
 	int (*shrink)(struct ion_heap *heap, gfp_t gfp_mask, int nr_to_scan);
 	void (*unmap_user)(struct ion_heap *mapper, struct ion_buffer *buffer);
+	int (*map_iommu)(struct ion_buffer *buffer,
+				struct ion_iommu_map *map_data,
+				unsigned int domain_num,
+				unsigned int partition_num,
+				unsigned long align,
+				unsigned long iova_length,
+				unsigned long flags);
+	void (*unmap_iommu)(struct ion_iommu_map *data);
 	int (*print_debug)(struct ion_heap *heap, struct seq_file *s,
 			   const struct list_head *mem_map);
+	int (*secure_heap)(struct ion_heap *heap, int version, void *data);
+	int (*unsecure_heap)(struct ion_heap *heap, int version, void *data);
 };
 
 /**
@@ -219,6 +267,10 @@ struct ion_heap {
 	atomic_long_t total_allocated;
 	atomic_long_t total_handles;
 };
+
+
+#define iommu_map_domain(__m)		((__m)->domain_info[1])
+#define iommu_map_partition(__m)	((__m)->domain_info[0])
 
 /**
  * ion_buffer_cached - this ion buffer is cached
