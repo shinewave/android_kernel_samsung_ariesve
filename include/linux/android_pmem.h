@@ -62,13 +62,13 @@
 #define PMEM_ALLOCATE_ALIGNED	_IOW(PMEM_IOCTL_MAGIC, 15, unsigned int)
 struct pmem_region {
 	unsigned long offset;
-	unsigned long len;
+	size_t len;
 };
 
 struct pmem_addr {
 	unsigned long vaddr;
 	unsigned long offset;
-	unsigned long length;
+	size_t length;
 };
 
 struct pmem_freespace {
@@ -77,20 +77,20 @@ struct pmem_freespace {
 };
 
 struct pmem_allocation {
-	unsigned long size;
+	size_t size;
 	unsigned int align;
 };
 
 #ifdef __KERNEL__
-int get_pmem_file(unsigned int fd, unsigned long *start, unsigned long *vstart,
+int get_pmem_file(unsigned int fd, phys_addr_t *start, unsigned long *vstart,
 		  unsigned long *end, struct file **filp);
-int get_pmem_fd(int fd, unsigned long *start, unsigned long *end);
-int get_pmem_user_addr(struct file *file, unsigned long *start,
+int get_pmem_fd(int fd, phys_addr_t *start, unsigned long *end);
+int get_pmem_user_addr(struct file *file, phys_addr_t *start,
 		       unsigned long *end);
 void put_pmem_file(struct file* file);
 void put_pmem_fd(int fd);
-void flush_pmem_fd(int fd, unsigned long start, unsigned long len);
-void flush_pmem_file(struct file *file, unsigned long start, unsigned long len);
+void flush_pmem_fd(int fd, phys_addr_t start, unsigned long len);
+void flush_pmem_file(struct file *file, phys_addr_t start, unsigned long len);
 int pmem_cache_maint(struct file *file, unsigned int cmd,
 		struct pmem_addr *pmem_addr);
 
