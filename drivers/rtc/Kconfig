@@ -1579,6 +1579,21 @@ config RTC_DRV_LPC32XX
 	  This driver can also be buillt as a module. If so, the module
 	  will be called rtc-lpc32xx.
 
+config RTC_DRV_MSM
+	tristate "RTC on Qualcomm Chipsets"
+	depends on ARCH_MSM
+	default y
+	help
+	  RTC driver for Qualcomm chipsets
+
+config RTC_SECURE_TIME_SUPPORT
+	bool "Support for secure time on Qualcomm Chipsets"
+	depends on RTC_DRV_MSM = y
+	default y
+	help
+	  Say yes here to have additional handle for reading secure time
+	  maintained by ARM9.
+
 config RTC_DRV_PM8XXX
 	tristate "Qualcomm PMIC8XXX RTC"
 	depends on MFD_PM8XXX || MFD_SPMI_PMIC || COMPILE_TEST
