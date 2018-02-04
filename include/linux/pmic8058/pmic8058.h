@@ -31,14 +31,14 @@
 #include <linux/mfd/pm8xxx/upl.h>
 #include <linux/mfd/pm8xxx/misc.h>
 #include <linux/mfd/pm8xxx/batt-alarm.h>
-#include <linux/pmic8058/leds-pmic8058.h>
-#include <linux/pmic8058/pmic8058-othc.h>
 #include <linux/mfd/pm8xxx/tm.h>
-#include <linux/pmic8058/pmic8058-xoadc.h>
-#include <linux/pmic8058/pmic8058-regulator.h>
-#include <linux/pmic8058/pm8058-xo.h>
+#include "leds.h"
+#include "othc.h"
+#include "xoadc.h"
+#include "regulator.h"
+#include "xo.h"
 #include <linux/pwm.h>
-#include <linux/pmic8058/pmic8058-pwm.h>
+#include "pwm.h"
 
 #ifdef CONFIG_CHARGER_SMB328A
 #define PM8058_GPIO(n)	((n) - 1)
