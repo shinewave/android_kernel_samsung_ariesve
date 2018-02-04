@@ -17,6 +17,24 @@
 
 #include <linux/types.h>
 
+struct ssbi_slave_info {
+	const char	*name;
+	void		*platform_data;
+};
+
+enum ssbi_controller_type {
+	MSM_SBI_CTRL_SSBI = 0,
+	MSM_SBI_CTRL_SSBI2,
+	MSM_SBI_CTRL_PMIC_ARBITER,
+	FSM_SBI_CTRL_SSBI,
+};
+
+struct ssbi_platform_data {
+	const char *rsl_id;
+	struct ssbi_slave_info	slave;
+	enum ssbi_controller_type controller_type;
+};
+
 int ssbi_write(struct device *dev, u16 addr, const u8 *buf, int len);
 int ssbi_read(struct device *dev, u16 addr, u8 *buf, int len);
 

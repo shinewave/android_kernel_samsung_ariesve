@@ -526,10 +526,10 @@ struct msm_i2c_platform_data {
 	void (*msm_i2c_config_gpio)(int iface, int config_type);
 };
 
-/*struct msm_i2c_ssbi_platform_data {
+struct msm_i2c_ssbi_platform_data {
 	const char *rsl_id;
 	enum ssbi_controller_type controller_type;
-};*/
+};
 
 struct msm_vidc_platform_data {
 	int memtype;

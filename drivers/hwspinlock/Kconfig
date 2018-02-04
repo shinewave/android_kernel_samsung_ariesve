@@ -55,7 +55,7 @@ config HSEM_U8500
 
 config REMOTE_SPINLOCK_MSM
 	bool "MSM Remote Spinlock Functionality"
-	depends on ARCH_QCOM
+	depends on ARCH_QCOM || ARCH_MSM
 	select HWSPINLOCK
 	help
 	  Say y here to support the MSM Remote Spinlock functionality, which
