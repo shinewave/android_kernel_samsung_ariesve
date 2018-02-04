@@ -279,6 +279,13 @@ config USB_EHCI_MV
 	  Dova, Armada 370 and Armada XP. See "Support for Marvell EBU
 	  on-chip EHCI USB controller" for those.
 
+config USB_EHCI_MSM_72K
+	bool "Support for Legacy Qualcomm on-chip EHCI USB controller"
+	depends on USB_EHCI_HCD && USB_MSM_OTG_72K && ARCH_MSM
+	---help---
+	  This driver enables support for USB host controller
+	  in pre 8660 qualcomm chipsets(8660, 7X30, 8X50 and 7X27).
+
 config USB_W90X900_EHCI
 	tristate "W90X900(W90P910) EHCI support"
 	depends on ARCH_W90X900

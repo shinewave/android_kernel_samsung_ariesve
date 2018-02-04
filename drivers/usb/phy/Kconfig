@@ -166,6 +166,44 @@ config USB_MSM_OTG
 	  This driver is not supported on boards like trout which
 	  has an external PHY.
 
+config USB_MSM_OTG_72K
+	bool "OTG support for Legacy Qualcomm on-chip USB controller"
+	depends on (USB || USB_GADGET) && (ARCH_MSM || COMPILE_TEST)
+	select USB_PHY
+	default USB_MSM_72K
+	help
+	  Enable this to support the USB OTG transceiver on MSM chips. It
+	  handles PHY initialization, clock management, low power mode and
+	  workarounds required after resetting the hardware. This driver is
+	  required for even peripheral only or host only mode configuration.
+	  Supports SRP and HNP when both gadget and Host are selected.
+
+config USB_MSM_OTG_72K_ALLOW_BUS_OVERDRAW
+	bool "Allow USB bus overdraw for OTG"
+	depends on USB_MSM_OTG_72K
+	help
+	  Enable this to allow USB bus overdraw when using peripherals
+	  attached via OTG on Legacy Qualcomm on-chip USB controller.
+
+config USB_MSM_ACA
+	bool "Support for Accessory Charger Adapter (ACA)"
+	depends on (USB_MSM_OTG || USB_MSM_OTG_72K) && ARCH_MSM
+	default n
+	help
+	  Accesory Charger Adapter is a charger specified in USB Battery
+	  Charging Specification(1.1). It enables OTG devices to charge
+	  while operating as a host or peripheral at the same time.
+
+config USB_MSM_STANDARD_ACA
+	bool "Support for Standard ACA"
+	depends on USB_MSM_ACA
+	default USB_MSM_OTG_72K
+	help
+	  A Standard ACA has a Standard-A receptacle on the Accessory Port,
+	  and can only be attached to a B-device.  RID_A and RID_GND states
+	  are only possible with Standard ACA.  Select this feature if the
+	  board is intended to support only Standard ACA.
+
 config USB_QCOM_8X16_PHY
 	tristate "Qualcomm APQ8016/MSM8916 on-chip USB PHY controller support"
 	depends on ARCH_QCOM || COMPILE_TEST
