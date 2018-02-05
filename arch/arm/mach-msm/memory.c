@@ -18,6 +18,7 @@
 #include <linux/mm_types.h>
 #include <linux/bootmem.h>
 #include <linux/module.h>
+#include <linux/memory_alloc.h>
 #include <linux/memblock.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
@@ -25,7 +26,6 @@
 #include <asm/cacheflush.h>
 #include <asm/setup.h>
 #include <asm/mach-types.h>
-#include <mach/memory_alloc.h>
 #include <mach/msm_memtypes.h>
 #include <linux/hardirq.h>
 #if defined(CONFIG_MSM_NPA_REMOTE)
@@ -42,7 +42,50 @@
 /* fixme */
 #include <asm/tlbflush.h>
 #include <../../mm/mm.h>
-#include <mach/fmem.h>
+
+void *strongly_ordered_page;
+char strongly_ordered_mem[PAGE_SIZE*2-4];
+
+void map_page_strongly_ordered(void)
+{
+#if defined(CONFIG_ARCH_MSM7X27) && !defined(CONFIG_ARCH_MSM7X27A)
+	long unsigned int phys;
+	struct map_desc map;
+
+	if (strongly_ordered_page)
+		return;
+
+	strongly_ordered_page = (void*)PFN_ALIGN((int)&strongly_ordered_mem);
+	phys = __pa(strongly_ordered_page);
+
+	map.pfn = __phys_to_pfn(phys);
+	map.virtual = MSM_STRONGLY_ORDERED_PAGE;
+	map.length = PAGE_SIZE;
+	map.type = MT_DEVICE_STRONGLY_ORDERED;
+	create_mapping(&map);
+
+	printk(KERN_ALERT "Initialized strongly ordered page successfully\n");
+#endif
+}
+EXPORT_SYMBOL(map_page_strongly_ordered);
+
+void write_to_strongly_ordered_memory(void)
+{
+#if defined(CONFIG_ARCH_MSM7X27) && !defined(CONFIG_ARCH_MSM7X27A)
+	if (!strongly_ordered_page) {
+		if (!in_interrupt())
+			map_page_strongly_ordered();
+		else {
+			printk(KERN_ALERT "Cannot map strongly ordered page in "
+				"Interrupt Context\n");
+			/* capture it here before the allocation fails later */
+			BUG();
+		}
+	}
+	*(int *)MSM_STRONGLY_ORDERED_PAGE = 0;
+#endif
+}
+EXPORT_SYMBOL(write_to_strongly_ordered_memory);
 
 /* These cache related routines make the assumption (if outer cache is
  * available) that the associated physical memory is contiguous.
@@ -105,7 +148,7 @@ char *memtype_name[] = {
 };
 
 struct reserve_info *reserve_info;
-/*
+
 static unsigned long stable_size(struct membank *mb,
 	unsigned long unstable_limit)
 {
@@ -114,9 +157,9 @@ static unsigned long stable_size(struct membank *mb,
 	if (!unstable_limit)
 		return mb->size;
 
-	/* Check for 32 bit roll-over *//*
+	/* Check for 32 bit roll-over */
 	if (upper_limit >= mb->start) {
-		/* If we didn't roll over we can safely make the check below *//*
+		/* If we didn't roll over we can safely make the check below */
 		if (upper_limit <= unstable_limit)
 			return mb->size;
 	}
@@ -126,7 +169,7 @@ static unsigned long stable_size(struct membank *mb,
 	return unstable_limit - mb->start;
 }
 
-/* stable size of all memory banks contiguous to and below this one *//*
+/* stable size of all memory banks contiguous to and below this one */
 static unsigned long total_stable_size(unsigned long bank)
 {
 	int i;
@@ -206,7 +249,7 @@ static void __init reserve_memory_for_mempools(void)
 		 * is in (and cause boot problems) and so that we might
 		 * be able to steal memory that would otherwise become
 		 * highmem. However, do not use unstable memory.
-		 *//*
+		 */
 		for (i = meminfo.nr_banks - 1; i >= 0; i--) {
 			mb = &meminfo.bank[i];
 			membank_type =
@@ -222,7 +265,7 @@ static void __init reserve_memory_for_mempools(void)
 				/* mt->size may be larger than size, all this
 				 * means is that we are carving the memory pool
 				 * out of multiple contiguous memory banks.
-				 *//*
+				 */
 				mt->start = mb->start + (size - mt->size);
 				ret = memblock_remove(mt->start, mt->size);
 				BUG_ON(ret);
@@ -271,7 +314,7 @@ void __init msm_reserve(void)
 	adjust_reserve_sizes();
 	reserve_memory_for_mempools();
 	initialize_mempools();
-}*/
+}
 
 static int get_ebi_memtype(void)
 {
@@ -364,16 +407,6 @@ void store_ttbr0(void)
 		: "=r" (msm_ttbr0));
 }
 
-int request_fmem_c_region(void *unused)
-{
-	return fmem_set_state(FMEM_C_STATE);
-}
-
-int release_fmem_c_region(void *unused)
-{
-	return fmem_set_state(FMEM_T_STATE);
-}
-
 static char * const memtype_names[] = {
 	[MEMTYPE_SMI_KERNEL] = "SMI_KERNEL",
 	[MEMTYPE_SMI]	= "SMI",
@@ -408,7 +441,7 @@ static int reserve_memory_type(const char *mem_name,
 	return ret;
 }
 
-/*static int check_for_compat(unsigned long node)
+static int check_for_compat(unsigned long node)
 {
 	char **start = __compat_exports_start;
 
@@ -495,9 +528,9 @@ mem_remove:
 
 out:
 	return 0;
-}*/
+}
 
-/*unsigned long get_ddr_size(void)
+unsigned long get_ddr_size(void)
 {
 	unsigned int i;
 	unsigned long ret = 0;
@@ -506,4 +539,4 @@ out:
 		ret += meminfo.bank[i].size;
 
 	return ret;
-}*/
+}

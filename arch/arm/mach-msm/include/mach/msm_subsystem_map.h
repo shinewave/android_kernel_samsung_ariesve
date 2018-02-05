@@ -69,8 +69,8 @@ struct msm_mapped_buffer {
 };
 
 extern struct msm_mapped_buffer *msm_subsystem_map_buffer(
-				phys_addr_t phys,
-				size_t length,
+				unsigned long phys,
+				unsigned int length,
 				unsigned int flags,
 				int *subsys_ids,
 				unsigned int nsubsys);
@@ -78,6 +78,6 @@ extern struct msm_mapped_buffer *msm_subsystem_map_buffer(
 extern int msm_subsystem_unmap_buffer(struct msm_mapped_buffer *buf);
 
 extern phys_addr_t msm_subsystem_check_iova_mapping(int subsys_id,
-						phys_addr_t iova);
+						unsigned long iova);
 
 #endif /* __ARCH_MACH_MSM_SUBSYSTEM_MAP_H */

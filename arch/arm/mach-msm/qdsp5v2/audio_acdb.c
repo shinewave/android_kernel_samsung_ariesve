@@ -16,7 +16,6 @@
 #include <linux/wait.h>
 #include <linux/mutex.h>
 #include <linux/io.h>
-#include <linux/android_pmem.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
 #include <linux/uaccess.h>
@@ -1287,7 +1286,6 @@ static long audio_acdb_ioctl(struct file *file, unsigned int cmd,
 {
 	int rc = 0;
 	unsigned long flags = 0;
-	struct msm_audio_pmem_info info;
 
 	MM_DBG("%s\n", __func__);
 
@@ -1307,23 +1305,6 @@ static long audio_acdb_ioctl(struct file *file, unsigned int cmd,
 		if (rc < 0)
 			MM_ERR("AUDPP returned err =%d\n", rc);
 		spin_unlock_irqrestore(&acdb_data.dsp_lock, flags);
-		break;
-	case AUDIO_REGISTER_PMEM:
-		MM_DBG("AUDIO_REGISTER_PMEM\n");
-		if (copy_from_user(&info, (void *) arg, sizeof(info))) {
-			MM_ERR("Cannot copy from user\n");
-			return -EFAULT;
-		}
-		rc = get_pmem_file(info.fd, &acdb_data.paddr,
-					&acdb_data.kvaddr,
-					&acdb_data.pmem_len,
-					&acdb_data.file);
-		if (rc == 0)
-			acdb_data.pmem_fd = info.fd;
-		break;
-	case AUDIO_DEREGISTER_PMEM:
-		if (acdb_data.pmem_fd)
-			put_pmem_file(acdb_data.file);
 		break;
 	case AUDIO_SET_ACDB_BLK:
 		MM_DBG("IOCTL AUDIO_SET_ACDB_BLK\n");
@@ -2259,6 +2240,7 @@ struct acdb_fluence_block *get_audpp_fluence_block(void)
 	return NULL;
 }
 
+#if 0
 static s32 acdb_fill_audpreproc_fluence(void)
 {
 	struct acdb_fluence_block *fluence_block = NULL;
@@ -2285,6 +2267,7 @@ static s32 acdb_fill_audpreproc_fluence(void)
 					& 0xFFFF0000) >> 16);
 	return 0;
 }
+#endif
 
 s32 acdb_calibrate_audpreproc(void)
 {
@@ -2347,6 +2330,8 @@ s32 acdb_calibrate_audpreproc(void)
 		} else
 			MM_DBG("RMC block was not found\n");
 	}
+/*remove fluence code because that acdb data has not fluence struct*/
+#if 0
 	if (!acdb_data.fleuce_feature_status[acdb_data.preproc_stream_id]) {
 		result = acdb_fill_audpreproc_fluence();
 		if (!(IS_ERR_VALUE(result))) {
@@ -2366,6 +2351,7 @@ s32 acdb_calibrate_audpreproc(void)
 			MM_ERR("fluence block is not found\n");
 	} else
 		MM_DBG("fluence block override\n");
+#endif
 done:
 	return result;
 }
@@ -3006,6 +2992,9 @@ static void audpp_cb(void *private, u32 id, u16 *msg)
 {
 	MM_DBG("\n");
 	if (id != AUDPP_MSG_CFG_MSG)
+		goto done;
+
+	if (acdb_data.device_info == NULL)
 		goto done;
 
 	if (msg[0] == AUDPP_MSG_ENA_DIS) {

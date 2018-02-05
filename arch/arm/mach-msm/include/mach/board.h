@@ -21,7 +21,7 @@
 #include <linux/types.h>
 #include <linux/input.h>
 #include <linux/usb.h>
-#include <linux/pmic8058/leds-pmic8058.h>
+#include <linux/pmic8058/leds.h>
 #include <linux/clkdev.h>
 #include <linux/of_platform.h>
 #include <linux/ssbi.h>
