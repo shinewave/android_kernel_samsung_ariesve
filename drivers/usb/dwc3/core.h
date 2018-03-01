@@ -217,6 +217,9 @@
 /* Global Debug LTSSM Register */
 #define DWC3_GDBGLTSSM_LINKSTATE_MASK	(0xF << 22)
 
+/* Global User Control 1 Register */
+#define DWC3_GUCTL1_DEV_L1_EXIT_BY_HW	(1 << 24)
+
 /* Global USB2 PHY Configuration Register */
 #define DWC3_GUSB2PHYCFG_PHYSOFTRST	(1 << 31)
 #define DWC3_GUSB2PHYCFG_ENBLSLPM	(1 << 8)
@@ -323,6 +326,8 @@
 
 /* Global User Control Register 2 */
 #define DWC3_GUCTL2_RST_ACTBITLATER		(1 << 14)
+#define DWC3_GUCTL2_HP_TIMER(n)			((n) << 21)
+#define DWC3_GUCTL2_HP_TIMER_MASK		DWC3_GUCTL2_HP_TIMER(0x1f)
 
 /* Device Configuration Register */
 #define DWC3_DCFG_DEVADDR(addr)	((addr) << 3)
@@ -1034,8 +1039,10 @@ struct dwc3 {
 #define DWC3_REVISION_260A	0x5533260a
 #define DWC3_REVISION_270A	0x5533270a
 #define DWC3_REVISION_280A	0x5533280a
+#define DWC3_REVISION_290A	0x5533290a
 #define DWC3_REVISION_300A	0x5533300a
 #define DWC3_REVISION_310A	0x5533310a
+#define DWC3_REVISION_320A	0x5533320a
 
 /*
  * NOTICE: we're using bit 31 as a "is usb 3.1" flag. This is really

@@ -82,6 +82,7 @@ struct hbtp_data {
 	bool override_disp_coords;
 	bool manage_afe_power_ana;
 	bool manage_power_dig;
+	bool regulator_enabled;
 	u32 power_on_delay;
 	u32 power_off_delay;
 	bool manage_pin_ctrl;
@@ -360,6 +361,11 @@ static int hbtp_pdev_power_on(struct hbtp_data *hbtp, bool on)
 	if (!on)
 		goto reg_off;
 
+	if (hbtp->regulator_enabled) {
+		pr_debug("%s: regulator already enabled\n", __func__);
+		return 0;
+	}
+
 	if (hbtp->vcc_ana) {
 		ret = reg_set_load_check(hbtp->vcc_ana,
 			hbtp->afe_load_ua);
@@ -403,9 +409,16 @@ static int hbtp_pdev_power_on(struct hbtp_data *hbtp, bool on)
 		}
 	}
 
+	hbtp->regulator_enabled = true;
+
 	return 0;
 
 reg_off:
+	if (!hbtp->regulator_enabled) {
+		pr_debug("%s: regulator not enabled\n", __func__);
+		return 0;
+	}
+
 	if (hbtp->vcc_dig) {
 		reg_set_load_check(hbtp->vcc_dig, 0);
 		regulator_disable(hbtp->vcc_dig);
@@ -422,6 +435,9 @@ reg_off:
 		reg_set_load_check(hbtp->vcc_ana, 0);
 		regulator_disable(hbtp->vcc_ana);
 	}
+
+	hbtp->regulator_enabled = false;
+
 	return 0;
 }
 
@@ -1165,12 +1181,6 @@ static int hbtp_dsi_panel_suspend(struct hbtp_data *ts)
 			pr_err("%s: failed to disable GPIO pins\n", __func__);
 			goto err_pin_disable;
 		}
-
-		rc = hbtp_pdev_power_on(ts, false);
-		if (rc) {
-			pr_err("%s: failed to disable power\n", __func__);
-			goto err_power_disable;
-		}
 		ts->power_suspended = true;
 		if (ts->input_dev) {
 			kobject_uevent_env(&ts->input_dev->dev.kobj,
@@ -1198,8 +1208,7 @@ static int hbtp_dsi_panel_suspend(struct hbtp_data *ts)
 	}
 	mutex_unlock(&hbtp->mutex);
 	return 0;
-err_power_disable:
-	hbtp_pinctrl_enable(ts, true);
+
 err_pin_disable:
 	mutex_unlock(&hbtp->mutex);
 	return rc;
@@ -1218,12 +1227,6 @@ static int hbtp_dsi_panel_early_resume(struct hbtp_data *ts)
 			mutex_unlock(&hbtp->mutex);
 			return 0;
 		}
-		rc = hbtp_pdev_power_on(ts, true);
-		if (rc) {
-			pr_err("%s: failed to enable panel power\n", __func__);
-			goto err_power_on;
-		}
-
 		rc = hbtp_pinctrl_enable(ts, true);
 
 		if (rc) {
@@ -1271,8 +1274,6 @@ static int hbtp_dsi_panel_early_resume(struct hbtp_data *ts)
 
 err_pin_enable:
 	hbtp_pdev_power_on(ts, false);
-err_power_on:
-	mutex_unlock(&hbtp->mutex);
 	return rc;
 }
 
@@ -1341,6 +1342,12 @@ static int hbtp_pdev_probe(struct platform_device *pdev)
 			}
 		}
 		hbtp->vcc_dig = vcc_dig;
+	}
+
+	error = hbtp_pdev_power_on(hbtp, true);
+	if (error) {
+		pr_err("%s: failed to power on\n", __func__);
+		return error;
 	}
 
 	return 0;

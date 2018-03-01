@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, The Linux foundation. All rights reserved.
+ * Copyright (c) 2017-2018, The Linux foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -894,7 +894,6 @@ static void msm_geni_serial_start_tx(struct uart_port *uport)
 
 		msm_geni_serial_prep_dma_tx(uport);
 	}
-	IPC_LOG_MSG(msm_port->ipc_log_misc, "%s\n", __func__);
 	return;
 check_flow_ctrl:
 	geni_ios = geni_read_reg_nolog(uport->membase, SE_GENI_IOS);
@@ -963,7 +962,18 @@ static void stop_tx_sequencer(struct uart_port *uport)
 							SE_GENI_M_IRQ_CLEAR);
 	}
 	geni_write_reg_nolog(M_CMD_CANCEL_EN, uport, SE_GENI_M_IRQ_CLEAR);
-	IPC_LOG_MSG(port->ipc_log_misc, "%s\n", __func__);
+	/*
+	 * If we end up having to cancel an on-going Tx for non-console usecase
+	 * then it means there was some unsent data in the Tx FIFO, consequently
+	 * it means that there is a vote imbalance as we put in a vote during
+	 * start_tx() that is removed only as part of a "done" ISR. To balance
+	 * this out, remove the vote put in during start_tx().
+	 */
+	if (!uart_console(uport)) {
+		IPC_LOG_MSG(port->ipc_log_misc, "%s:Removing vote\n", __func__);
+		msm_geni_serial_power_off(uport);
+	}
+	IPC_LOG_MSG(port->ipc_log_misc, "%s:\n", __func__);
 }
 
 static void msm_geni_serial_stop_tx(struct uart_port *uport)
@@ -1727,7 +1737,8 @@ exit_startup:
 static int get_clk_cfg(unsigned long clk_freq, unsigned long *ser_clk)
 {
 	unsigned long root_freq[] = {7372800, 14745600, 19200000, 29491200,
-		32000000, 48000000, 64000000, 80000000, 96000000, 100000000};
+		32000000, 48000000, 64000000, 80000000, 96000000, 100000000,
+		102400000, 112000000, 120000000, 128000000};
 	int i;
 	int match = -1;
 
@@ -2135,7 +2146,7 @@ msm_geni_serial_earlycon_setup(struct earlycon_device *dev,
 exit_geni_serial_earlyconsetup:
 	return ret;
 }
-OF_EARLYCON_DECLARE(msm_geni_serial, "qcom,msm-geni-uart",
+OF_EARLYCON_DECLARE(msm_geni_serial, "qcom,msm-geni-console",
 		msm_geni_serial_earlycon_setup);
 
 static int console_register(struct uart_driver *drv)
@@ -2528,6 +2539,8 @@ static int msm_geni_serial_runtime_suspend(struct device *dev)
 		 * doing a stop_rx else we could end up flowing off the peer.
 		 */
 		mb();
+		IPC_LOG_MSG(port->ipc_log_pwr, "%s: Manual Flow ON 0x%x\n",
+						 __func__, uart_manual_rfr);
 	}
 	stop_rx_sequencer(&port->uport);
 	if ((geni_status & M_GENI_CMD_ACTIVE))
@@ -2609,6 +2622,7 @@ static int msm_geni_serial_sys_suspend_noirq(struct device *dev)
 			mutex_unlock(&tty_port->mutex);
 			return -EBUSY;
 		}
+		IPC_LOG_MSG(port->ipc_log_pwr, "%s\n", __func__);
 		mutex_unlock(&tty_port->mutex);
 	}
 	return 0;
@@ -2657,17 +2671,12 @@ static const struct dev_pm_ops msm_geni_serial_pm_ops = {
 	.resume_noirq = msm_geni_serial_sys_resume_noirq,
 };
 
-static const struct of_device_id msm_geni_serial_match_table[] = {
-	{ .compatible = "qcom,msm-geni-uart"},
-	{},
-};
-
 static struct platform_driver msm_geni_serial_platform_driver = {
 	.remove = msm_geni_serial_remove,
 	.probe = msm_geni_serial_probe,
 	.driver = {
 		.name = "msm_geni_serial",
-		.of_match_table = msm_geni_serial_match_table,
+		.of_match_table = msm_geni_device_tbl,
 		.pm = &msm_geni_serial_pm_ops,
 	},
 };

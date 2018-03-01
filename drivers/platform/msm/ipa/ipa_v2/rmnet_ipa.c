@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -45,7 +45,7 @@
 #define IPA_RM_INACTIVITY_TIMER 100 /* IPA_RM */
 #define HEADROOM_FOR_QMAP   8 /* for mux header */
 #define TAILROOM            0 /* for padding by mux layer */
-#define MAX_NUM_OF_MUX_CHANNEL  10 /* max mux channels */
+#define MAX_NUM_OF_MUX_CHANNEL  15 /* max mux channels */
 #define UL_FILTER_RULE_HANDLE_START 69
 #define DEFAULT_OUTSTANDING_HIGH_CTL 96
 #define DEFAULT_OUTSTANDING_HIGH 64
@@ -774,7 +774,7 @@ static int find_vchannel_name_index(const char *vchannel_name)
 	int i;
 
 	for (i = 0; i < MAX_NUM_OF_MUX_CHANNEL; i++) {
-		if (strcmp(mux_channel[i].vchannel_name, vchannel_name == 0))
+		if (strcmp(mux_channel[i].vchannel_name, vchannel_name) == 0)
 			return i;
 	}
 	return MAX_NUM_OF_MUX_CHANNEL;
@@ -2648,7 +2648,7 @@ static int rmnet_ipa_set_data_quota_modem(struct wan_ioctl_set_data_quota *data)
 	if (index == MAX_NUM_OF_MUX_CHANNEL) {
 		IPAWANERR("%s is an invalid iface name\n",
 			  data->interface_name);
-		return -EFAULT;
+		return -ENODEV;
 	}
 
 	mux_id = mux_channel[index].mux_id;
@@ -2808,7 +2808,8 @@ static int rmnet_ipa_query_tethering_stats_wifi(
 	if (rc) {
 		kfree(sap_stats);
 		return rc;
-	} else if (reset) {
+	} else if (data == NULL) {
+		IPAWANDBG("only reset wlan stats\n");
 		kfree(sap_stats);
 		return 0;
 	}
@@ -2868,7 +2869,7 @@ int rmnet_ipa_query_tethering_stats_modem(
 	if (reset) {
 		req->reset_stats_valid = true;
 		req->reset_stats = true;
-		IPAWANERR("reset the pipe stats\n");
+		IPAWANDBG("reset the pipe stats\n");
 	} else {
 		/* print tethered-client enum */
 		IPAWANDBG_LOW("Tethered-client enum(%d)\n", data->ipa_client);
@@ -2881,6 +2882,7 @@ int rmnet_ipa_query_tethering_stats_modem(
 		kfree(resp);
 		return rc;
 	} else if (data == NULL) {
+		IPAWANDBG("only reset modem stats\n");
 		kfree(req);
 		kfree(resp);
 		return 0;
@@ -3075,10 +3077,7 @@ int rmnet_ipa_query_tethering_stats_all(
 int rmnet_ipa_reset_tethering_stats(struct wan_ioctl_reset_tether_stats *data)
 {
 	enum ipa_upstream_type upstream_type;
-	struct wan_ioctl_query_tether_stats tether_stats;
 	int rc = 0;
-
-	memset(&tether_stats, 0, sizeof(struct wan_ioctl_query_tether_stats));
 
 	/* prevent string buffer overflows */
 	data->upstreamIface[IFNAMSIZ-1] = '\0';
@@ -3100,7 +3099,7 @@ int rmnet_ipa_reset_tethering_stats(struct wan_ioctl_reset_tether_stats *data)
 	} else {
 		IPAWANDBG(" reset modem-backhaul stats\n");
 		rc = rmnet_ipa_query_tethering_stats_modem(
-			&tether_stats, true);
+			NULL, true);
 		if (rc) {
 			IPAWANERR("reset MODEM stats failed\n");
 			return rc;

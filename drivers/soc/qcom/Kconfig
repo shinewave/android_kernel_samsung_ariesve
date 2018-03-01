@@ -365,6 +365,16 @@ config MSM_GLINK
 	  is handled by transport plug-ins that can be individually enabled and
 	  configured separately.
 
+config MSM_TZ_SMMU
+	depends on ARCH_MSM8953
+	bool "Helper functions for SMMU configuration through TZ"
+	help
+	  Say 'Y' here for targets that need to call into TZ to configure
+	  SMMUs for any reason (for example, for errata workarounds or
+	  configuration of SMMU virtualization).
+
+	  If unsure, say N.
+
 config MSM_GLINK_LOOPBACK_SERVER
 	bool "Generic Link (G-Link) Loopback Server"
 	help
@@ -764,3 +774,5 @@ config QCOM_QDSS_BRIDGE
 	  The driver will help route diag traffic from modem side over the QDSS
 	  sub-system to USB on APSS side. The driver acts as a bridge between the
 	  MHI and USB interface. If unsure, say N.
+
+source "drivers/soc/qcom/wcnss/Kconfig"

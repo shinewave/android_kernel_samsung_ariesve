@@ -413,7 +413,7 @@ int dwc3_send_gadget_ep_cmd(struct dwc3_ep *dep, unsigned cmd,
 		dwc3_trace(trace_dwc3_gadget, "Command Timed Out");
 		dev_err(dwc->dev, "%s command timeout for %s\n",
 			dwc3_gadget_ep_cmd_string(cmd), dep->name);
-		if (!(cmd & DWC3_DEPCMD_ENDTRANSFER)) {
+		if (cmd != DWC3_DEPCMD_ENDTRANSFER) {
 			dwc->ep_cmd_timeout_cnt++;
 			dwc3_notify_event(dwc,
 				DWC3_CONTROLLER_RESTART_USB_SESSION);
@@ -3134,6 +3134,15 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 	dwc3_writel(dwc->regs, DWC3_DCTL, reg);
 	dwc->test_mode = false;
 
+	/*
+	 * From SNPS databook section 8.1.2
+	 * the EP0 should be in setup phase. So ensure
+	 * that EP0 is in setup phase by issuing a stall
+	 * and restart if EP0 is not in setup phase.
+	 */
+	if (dwc->ep0state != EP0_SETUP_PHASE)
+		dwc3_ep0_stall_and_restart(dwc);
+
 	dwc3_stop_active_transfers(dwc);
 	dwc3_clear_stall_all_ep(dwc);
 
@@ -3959,15 +3968,10 @@ void dwc3_gadget_exit(struct dwc3 *dwc)
 
 int dwc3_gadget_suspend(struct dwc3 *dwc)
 {
-	int ret;
-
 	if (!dwc->gadget_driver)
 		return 0;
 
-	ret = dwc3_gadget_run_stop(dwc, false, false);
-	if (ret < 0)
-		return ret;
-
+	dwc3_gadget_run_stop(dwc, false, false);
 	dwc3_disconnect_gadget(dwc);
 	__dwc3_gadget_stop(dwc);
 

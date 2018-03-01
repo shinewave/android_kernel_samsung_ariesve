@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -386,6 +386,8 @@ int ipa3_reset_gsi_channel(u32 clnt_hdl)
 	int result = -EFAULT;
 	enum gsi_status gsi_res;
 	int aggr_active_bitmap = 0;
+	bool undo_aggr_value = false;
+	struct ipahal_reg_clkon_cfg fields;
 
 	IPADBG("entry\n");
 	if (clnt_hdl >= ipa3_ctx->ipa_num_pipes ||
@@ -398,6 +400,25 @@ int ipa3_reset_gsi_channel(u32 clnt_hdl)
 
 	if (!ep->keep_ipa_awake)
 		IPA_ACTIVE_CLIENTS_INC_EP(ipa3_get_client_mapping(clnt_hdl));
+
+	/*
+	 * IPAv4.0 HW has a limitation where WSEQ in MBIM NTH header is not
+	 * reset to 0 when MBIM pipe is reset. Workaround is to disable
+	 * HW clock gating for AGGR block using IPA_CLKON_CFG reg. undo flag to
+	 * disable the bit after reset is finished
+	 */
+	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_0) {
+		if (ep->cfg.aggr.aggr == IPA_MBIM_16 &&
+			ep->cfg.aggr.aggr_en != IPA_BYPASS_AGGR) {
+			ipahal_read_reg_fields(IPA_CLKON_CFG, &fields);
+			if (fields.open_aggr_wrapper == true) {
+				undo_aggr_value = true;
+				fields.open_aggr_wrapper = false;
+				ipahal_write_reg_fields(IPA_CLKON_CFG, &fields);
+			}
+		}
+	}
+
 	/*
 	 * Check for open aggregation frame on Consumer EP -
 	 * reset with open aggregation frame WA
@@ -429,10 +450,22 @@ finish_reset:
 	if (!ep->keep_ipa_awake)
 		IPA_ACTIVE_CLIENTS_DEC_EP(ipa3_get_client_mapping(clnt_hdl));
 
+	/* undo the aggr value if flag was set above*/
+	if (undo_aggr_value) {
+		fields.open_aggr_wrapper = false;
+		ipahal_write_reg_fields(IPA_CLKON_CFG, &fields);
+	}
+
 	IPADBG("exit\n");
 	return 0;
 
 reset_chan_fail:
+	/* undo the aggr value if flag was set above*/
+	if (undo_aggr_value) {
+		fields.open_aggr_wrapper = false;
+		ipahal_write_reg_fields(IPA_CLKON_CFG, &fields);
+	}
+
 	if (!ep->keep_ipa_awake)
 		IPA_ACTIVE_CLIENTS_DEC_EP(ipa3_get_client_mapping(clnt_hdl));
 	return result;
@@ -515,10 +548,17 @@ int ipa3_smmu_map_peer_reg(phys_addr_t phys_addr, bool map)
 	return 0;
 }
 
-int ipa3_smmu_map_peer_buff(u64 iova, phys_addr_t phys_addr, u32 size, bool map)
+int ipa3_smmu_map_peer_buff(u64 iova, u32 size, bool map, struct sg_table *sgt)
 {
 	struct iommu_domain *smmu_domain;
 	int res;
+	phys_addr_t phys;
+	unsigned long va;
+	struct scatterlist *sg;
+	int count = 0;
+	size_t len;
+	int i;
+	struct page *page;
 
 	if (ipa3_ctx->s1_bypass_arr[IPA_SMMU_CB_AP])
 		return 0;
@@ -529,33 +569,53 @@ int ipa3_smmu_map_peer_buff(u64 iova, phys_addr_t phys_addr, u32 size, bool map)
 		return -EINVAL;
 	}
 
+	/*
+	 * USB GSI driver would update sgt irrespective of USB S1
+	 * is enable or bypass.
+	 * If USB S1 is enabled using IOMMU, iova != pa.
+	 * If USB S1 is bypass, iova == pa.
+	 */
 	if (map) {
-		res = ipa3_iommu_map(smmu_domain,
-			rounddown(iova, PAGE_SIZE),
-			rounddown(phys_addr, PAGE_SIZE),
-			roundup(size + iova - rounddown(iova, PAGE_SIZE),
-			PAGE_SIZE),
-			IOMMU_READ | IOMMU_WRITE);
-		if (res) {
-			IPAERR("Fail to map 0x%llx->0x%pa\n", iova, &phys_addr);
-			return -EINVAL;
+		if (sgt != NULL) {
+			va = rounddown(iova, PAGE_SIZE);
+			for_each_sg(sgt->sgl, sg, sgt->nents, i) {
+				page = sg_page(sg);
+				phys = page_to_phys(page);
+				len = PAGE_ALIGN(sg->offset + sg->length);
+				res = ipa3_iommu_map(smmu_domain, va, phys,
+					len, IOMMU_READ | IOMMU_WRITE);
+				if (res) {
+					IPAERR("Fail to map pa=%pa\n", &phys);
+					return -EINVAL;
+				}
+				va += len;
+				count++;
+			}
+		} else {
+			res = ipa3_iommu_map(smmu_domain,
+				rounddown(iova, PAGE_SIZE),
+				rounddown(iova, PAGE_SIZE),
+				roundup(size + iova -
+					rounddown(iova, PAGE_SIZE),
+				PAGE_SIZE),
+				IOMMU_READ | IOMMU_WRITE);
+			if (res) {
+				IPAERR("Fail to map 0x%llx\n", iova);
+				return -EINVAL;
+			}
 		}
 	} else {
 		res = iommu_unmap(smmu_domain,
-			rounddown(iova, PAGE_SIZE),
-			roundup(size + iova - rounddown(iova, PAGE_SIZE),
-			PAGE_SIZE));
+		rounddown(iova, PAGE_SIZE),
+		roundup(size + iova - rounddown(iova, PAGE_SIZE),
+		PAGE_SIZE));
 		if (res != roundup(size + iova - rounddown(iova, PAGE_SIZE),
 			PAGE_SIZE)) {
-			IPAERR("Fail to unmap 0x%llx->0x%pa\n",
-				iova, &phys_addr);
+			IPAERR("Fail to unmap 0x%llx\n", iova);
 			return -EINVAL;
 		}
 	}
-
-	IPADBG("Peer buff %s 0x%llx->0x%pa\n", map ? "map" : "unmap",
-		iova, &phys_addr);
-
+	IPADBG("Peer buff %s 0x%llx\n", map ? "map" : "unmap", iova);
 	return 0;
 }
 
@@ -681,6 +741,10 @@ int ipa3_request_gsi_channel(struct ipa_request_gsi_channel_params *params,
 		sizeof(union __packed gsi_channel_scratch));
 	ep->chan_scratch.xdci.max_outstanding_tre =
 		params->chan_params.re_size * gsi_ep_cfg_ptr->ipa_if_tlv;
+
+	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_0)
+		ep->chan_scratch.xdci.max_outstanding_tre = 0;
+
 	gsi_res = gsi_write_channel_scratch(ep->gsi_chan_hdl,
 		params->chan_scratch);
 	if (gsi_res != GSI_STATUS_SUCCESS) {

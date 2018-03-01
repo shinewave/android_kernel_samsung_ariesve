@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -222,7 +222,13 @@ static void ipa3_send_nop_desc(struct work_struct *work)
 	tx_pkt->no_unmap_dma = true;
 	tx_pkt->sys = sys;
 	spin_lock_bh(&sys->spinlock);
+	if (unlikely(!sys->nop_pending)) {
+		spin_unlock_bh(&sys->spinlock);
+		kmem_cache_free(ipa3_ctx->tx_pkt_wrapper_cache, tx_pkt);
+		return;
+	}
 	list_add_tail(&tx_pkt->link, &sys->head_desc_list);
+	sys->nop_pending = false;
 	spin_unlock_bh(&sys->spinlock);
 
 	memset(&nop_xfer, 0, sizeof(nop_xfer));
@@ -236,6 +242,8 @@ static void ipa3_send_nop_desc(struct work_struct *work)
 		return;
 	}
 	sys->len_pending_xfer = 0;
+	/* make sure TAG process is sent before clocks are gated */
+	ipa3_ctx->tag_process_before_gating = true;
 
 }
 
@@ -271,6 +279,7 @@ int ipa3_send(struct ipa3_sys_context *sys,
 	int result;
 	u32 mem_flag = GFP_ATOMIC;
 	const struct ipa_gsi_ep_config *gsi_ep_cfg;
+	bool send_nop = false;
 
 	if (unlikely(!in_atomic))
 		mem_flag = GFP_KERNEL;
@@ -408,16 +417,23 @@ int ipa3_send(struct ipa3_sys_context *sys,
 	}
 	kfree(gsi_xfer_elem_array);
 
+	if (sys->use_comm_evt_ring && !sys->nop_pending) {
+		sys->nop_pending = true;
+		send_nop = true;
+	}
 	spin_unlock_bh(&sys->spinlock);
 
 	/* set the timer for sending the NOP descriptor */
-	if (sys->use_comm_evt_ring && !hrtimer_active(&sys->db_timer)) {
+	if (send_nop) {
 		ktime_t time = ktime_set(0, IPA_TX_SEND_COMPL_NOP_DELAY_NS);
 
 		IPADBG_LOW("scheduling timer for ch %lu\n",
 			sys->ep->gsi_chan_hdl);
 		hrtimer_start(&sys->db_timer, time, HRTIMER_MODE_REL);
 	}
+
+	/* make sure TAG process is sent before clocks are gated */
+	ipa3_ctx->tag_process_before_gating = true;
 
 	return 0;
 
@@ -823,7 +839,7 @@ static void ipa_pm_sys_pipe_cb(void *p, enum ipa_pm_cb_event event)
 		 * pipe will be unsuspended as part of
 		 * enabling IPA clocks
 		 */
-		ipa_pm_activate_sync(sys->pm_hdl);
+		ipa_pm_activate(sys->pm_hdl);
 		ipa_pm_deferred_deactivate(sys->pm_hdl);
 		break;
 	default:
@@ -2327,6 +2343,7 @@ begin:
 			IPA_STATS_DEC_CNT(ipa3_ctx->stats.rx_excp_pkts
 				[IPAHAL_PKT_STATUS_EXCEPTION_NONE]);
 		}
+		tx_pkt = NULL;
 	};
 
 	return rc;
@@ -2569,10 +2586,12 @@ void ipa3_lan_rx_cb(void *priv, enum ipa_dp_evt_type evt, unsigned long data)
 	struct ipa3_ep_context *ep;
 	unsigned int src_pipe;
 	u32 metadata;
+	u8 ucp;
 
 	ipahal_pkt_status_parse(rx_skb->data, &status);
 	src_pipe = status.endp_src_idx;
 	metadata = status.metadata;
+	ucp = status.ucp;
 	ep = &ipa3_ctx->ep[src_pipe];
 	if (unlikely(src_pipe >= ipa3_ctx->ipa_num_pipes ||
 		!ep->valid ||
@@ -2595,8 +2614,10 @@ void ipa3_lan_rx_cb(void *priv, enum ipa_dp_evt_type evt, unsigned long data)
 	 *  ------------------------------------------
 	 */
 	*(u16 *)rx_skb->cb = ((metadata >> 16) & 0xFFFF);
+	*(u8 *)(rx_skb->cb + 4) = ucp;
 	IPADBG_LOW("meta_data: 0x%x cb: 0x%x\n",
 			metadata, *(u32 *)rx_skb->cb);
+	IPADBG_LOW("ucp: %d\n", *(u8 *)(rx_skb->cb + 4));
 
 	ep->client_notify(ep->priv, IPA_RECEIVE, (unsigned long)(rx_skb));
 }
@@ -3674,6 +3695,12 @@ static int ipa_gsi_setup_channel(struct ipa_sys_connect_params *in,
 	ch_scratch.gpi.max_outstanding_tre = gsi_ep_info->ipa_if_tlv *
 		GSI_CHAN_RE_SIZE_16B;
 	ch_scratch.gpi.outstanding_threshold = 2 * GSI_CHAN_RE_SIZE_16B;
+
+	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_0) {
+		ch_scratch.gpi.max_outstanding_tre = 0;
+		ch_scratch.gpi.outstanding_threshold = 0;
+	}
+
 	result = gsi_write_channel_scratch(ep->gsi_chan_hdl, ch_scratch);
 	if (result != GSI_STATUS_SUCCESS) {
 		IPAERR("failed to write scratch %d\n", result);

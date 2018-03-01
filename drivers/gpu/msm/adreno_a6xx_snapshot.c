@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -241,7 +241,7 @@ static const unsigned int a6xx_vbif_ver_20xxxxxx_registers[] = {
 
 static const unsigned int a6xx_gbif_registers[] = {
 	/* GBIF */
-	0x3C00, 0X3C0B, 0X3C40, 0X3C47, 0X3CC0, 0X3CD1,
+	0x3C00, 0X3C0B, 0X3C40, 0X3C47, 0X3CC0, 0X3CD1, 0xE3A, 0xE3A,
 };
 
 static const unsigned int a6xx_gmu_gx_registers[] = {
@@ -1474,6 +1474,8 @@ void a6xx_snapshot_gmu(struct adreno_device *adreno_dev,
 				a6xx_gmu_gx_registers,
 				ARRAY_SIZE(a6xx_gmu_gx_registers) / 2);
 	}
+
+	a6xx_snapshot_debugbus(device, snapshot);
 }
 
 /* a6xx_snapshot_sqe() - Dump SQE data in snapshot */
@@ -1630,8 +1632,6 @@ void a6xx_snapshot(struct adreno_device *adreno_dev,
 		/* registers dumped through DBG AHB */
 		a6xx_snapshot_dbgahb_regs(device, snapshot);
 	}
-
-	a6xx_snapshot_debugbus(device, snapshot);
 
 }
 

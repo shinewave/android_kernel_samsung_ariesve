@@ -25,6 +25,7 @@
 #include "cam_mem_mgr.h"
 #include "cam_smmu_api.h"
 #include "cam_soc_util.h"
+#include "cam_req_mgr_timer.h"
 
 #define CAM_ICP_ROLE_PARENT     1
 #define CAM_ICP_ROLE_CHILD      2
@@ -111,6 +112,16 @@ struct hfi_msg_work_data {
 };
 
 /**
+  * struct clk_work_data
+  * @type: Task type
+  * @data: Pointer to clock info
+  */
+struct clk_work_data {
+	uint32_t type;
+	void *data;
+};
+
+/**
  * struct hfi_frame_process_info
  * @hfi_frame_cmd: Frame process command info
  * @bitmap: Bitmap for hfi_frame_cmd
@@ -131,6 +142,7 @@ struct hfi_frame_process_info {
 	uint32_t num_out_resources[CAM_FRAME_CMD_MAX];
 	uint32_t out_resource[CAM_FRAME_CMD_MAX][CAM_MAX_OUT_RES];
 	uint32_t in_resource[CAM_FRAME_CMD_MAX];
+	uint32_t in_free_resource[CAM_FRAME_CMD_MAX];
 	uint32_t fw_process_flag[CAM_FRAME_CMD_MAX];
 	struct cam_icp_clk_bw_request clk_info[CAM_FRAME_CMD_MAX];
 };
@@ -206,8 +218,10 @@ struct icp_cmd_generic_blob {
  * @curr_clk: Current clock of hadrware
  * @threshold: Threshold for overclk count
  * @over_clked: Over clock count
- * #uncompressed_bw: Current bandwidth voting
+ * @uncompressed_bw: Current bandwidth voting
  * @compressed_bw: Current compressed bandwidth voting
+ * @hw_type: IPE/BPS device type
+ * @watch_dog: watchdog timer handle
  */
 struct cam_icp_clk_info {
 	uint32_t base_clk;
@@ -216,6 +230,8 @@ struct cam_icp_clk_info {
 	uint32_t over_clked;
 	uint64_t uncompressed_bw;
 	uint64_t compressed_bw;
+	uint32_t hw_type;
+	struct cam_req_mgr_timer *watch_dog;
 };
 
 /**
@@ -242,6 +258,8 @@ struct cam_icp_clk_info {
  * @dentry: Debugfs entry
  * @a5_debug: A5 debug flag
  * @icp_pc_flag: Flag to enable/disable power collapse
+ * @ipe_bps_pc_flag: Flag to enable/disable
+ *                   power collapse for ipe & bps
  * @icp_debug_clk: Set clock based on debug value
  * @icp_default_clk: Set this clok if user doesn't supply
  * @clk_info: Clock info of hardware
@@ -279,6 +297,7 @@ struct cam_icp_hw_mgr {
 	struct dentry *dentry;
 	bool a5_debug;
 	bool icp_pc_flag;
+	bool ipe_bps_pc_flag;
 	uint64_t icp_debug_clk;
 	uint64_t icp_default_clk;
 	struct cam_icp_clk_info clk_info[ICP_CLK_HW_MAX];
@@ -290,6 +309,10 @@ struct cam_icp_hw_mgr {
 	bool ipe1_enable;
 	bool bps_enable;
 	uint32_t core_info;
+	struct cam_hw_intf *a5_dev_intf;
+	struct cam_hw_intf *ipe0_dev_intf;
+	struct cam_hw_intf *ipe1_dev_intf;
+	struct cam_hw_intf *bps_dev_intf;
 };
 
 static int cam_icp_mgr_hw_close(void *hw_priv, void *hw_close_args);

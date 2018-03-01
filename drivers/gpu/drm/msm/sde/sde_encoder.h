@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -54,11 +54,13 @@ struct sde_encoder_hw_resources {
 /**
  * sde_encoder_kickoff_params - info encoder requires at kickoff
  * @inline_rotate_prefill: number of lines to prefill for inline rotation
+ * @is_primary: set to true if the display is primary display
  * @affected_displays:  bitmask, bit set means the ROI of the commit lies within
  *                      the bounds of the physical display at the bit index
  */
 struct sde_encoder_kickoff_params {
 	u32 inline_rotate_prefill;
+	u32 is_primary;
 	unsigned long affected_displays;
 };
 
@@ -106,6 +108,13 @@ void sde_encoder_register_frame_event_callback(struct drm_encoder *encoder,
  * @encoder:	encoder pointer
  */
 struct sde_rsc_client *sde_encoder_get_rsc_client(struct drm_encoder *encoder);
+
+/**
+ * sde_encoder_poll_line_counts - poll encoder line counts for start of frame
+ * @encoder:	encoder pointer
+ * @Returns:	zero on success
+ */
+int sde_encoder_poll_line_counts(struct drm_encoder *encoder);
 
 /**
  * sde_encoder_prepare_for_kickoff - schedule double buffer flip of the ctl

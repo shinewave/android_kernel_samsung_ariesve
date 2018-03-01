@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -45,7 +45,7 @@
 #define IPA_RM_INACTIVITY_TIMER 100 /* IPA_RM */
 #define HEADROOM_FOR_QMAP   8 /* for mux header */
 #define TAILROOM            0 /* for padding by mux layer */
-#define MAX_NUM_OF_MUX_CHANNEL  10 /* max mux channels */
+#define MAX_NUM_OF_MUX_CHANNEL  15 /* max mux channels */
 #define UL_FILTER_RULE_HANDLE_START 69
 #define DEFAULT_OUTSTANDING_HIGH 128
 #define DEFAULT_OUTSTANDING_HIGH_CTL (DEFAULT_OUTSTANDING_HIGH+32)
@@ -2711,8 +2711,13 @@ static int ipa3_ssr_notifier_cb(struct notifier_block *this,
 		if (atomic_read(&rmnet_ipa3_ctx->is_ssr))
 			/* clean up cached QMI msg/handlers */
 			ipa3_qmi_service_exit();
-		/*hold a proxy vote for the modem*/
-		ipa3_proxy_clk_vote();
+		/*
+		 * hold a proxy vote for the modem.
+		 * for IPA 4.0 offline charge is not needed and proxy vote
+		 * is already held.
+		 */
+		if (ipa3_ctx->ipa_hw_type != IPA_HW_v4_0)
+			ipa3_proxy_clk_vote();
 		ipa3_reset_freeze_vote();
 		IPAWANINFO("IPA BEFORE_POWERUP handling is complete\n");
 		break;
@@ -2950,7 +2955,7 @@ static int rmnet_ipa3_set_data_quota_modem(
 	if (index == MAX_NUM_OF_MUX_CHANNEL) {
 		IPAWANERR("%s is an invalid iface name\n",
 			  data->interface_name);
-		return -EFAULT;
+		return -ENODEV;
 	}
 
 	mux_id = rmnet_ipa3_ctx->mux_channel[index].mux_id;
@@ -3112,7 +3117,8 @@ static int rmnet_ipa3_query_tethering_stats_wifi(
 		IPAWANERR("can't get ipa3_get_wlan_stats\n");
 		kfree(sap_stats);
 		return rc;
-	} else if (reset) {
+	} else if (data == NULL) {
+		IPAWANDBG("only reset wlan stats\n");
 		kfree(sap_stats);
 		return 0;
 	}
@@ -3170,7 +3176,7 @@ static int rmnet_ipa3_query_tethering_stats_modem(
 	if (reset) {
 		req->reset_stats_valid = true;
 		req->reset_stats = true;
-		IPAWANERR("reset the pipe stats\n");
+		IPAWANDBG("reset the pipe stats\n");
 	} else {
 		/* print tethered-client enum */
 		IPAWANDBG("Tethered-client enum(%d)\n", data->ipa_client);
@@ -3183,6 +3189,7 @@ static int rmnet_ipa3_query_tethering_stats_modem(
 		kfree(resp);
 		return rc;
 	} else if (data == NULL) {
+		IPAWANDBG("only reset modem stats\n");
 		kfree(req);
 		kfree(resp);
 		return 0;
@@ -3377,10 +3384,7 @@ int rmnet_ipa3_query_tethering_stats_all(
 int rmnet_ipa3_reset_tethering_stats(struct wan_ioctl_reset_tether_stats *data)
 {
 	enum ipa_upstream_type upstream_type;
-	struct wan_ioctl_query_tether_stats tether_stats;
 	int rc = 0;
-
-	memset(&tether_stats, 0, sizeof(struct wan_ioctl_query_tether_stats));
 
 	/* prevent string buffer overflows */
 	data->upstreamIface[IFNAMSIZ-1] = '\0';
@@ -3402,7 +3406,7 @@ int rmnet_ipa3_reset_tethering_stats(struct wan_ioctl_reset_tether_stats *data)
 	} else {
 		IPAWANERR(" reset modem-backhaul stats\n");
 		rc = rmnet_ipa3_query_tethering_stats_modem(
-			&tether_stats, true);
+			NULL, true);
 		if (rc) {
 			IPAWANERR("reset MODEM stats failed\n");
 			return rc;
@@ -4021,6 +4025,10 @@ static int __init ipa3_wwan_init(void)
 	ipa3_qmi_init();
 
 	/* Register for Modem SSR */
+	/* SSR is not supported yet on IPA 4.0 */
+	if (ipa3_ctx->ipa_hw_type == IPA_HW_v4_0)
+		return platform_driver_register(&rmnet_ipa_driver);
+
 	rmnet_ipa3_ctx->subsys_notify_handle = subsys_notif_register_notifier(
 			SUBSYS_MODEM,
 			&ipa3_ssr_notifier);

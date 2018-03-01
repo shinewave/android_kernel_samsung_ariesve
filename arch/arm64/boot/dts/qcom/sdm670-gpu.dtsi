@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,6 +16,7 @@
 		compatible = "qcom,pil-tz-generic";
 		qcom,pas-id = <13>;
 		qcom,firmware-name = "a615_zap";
+		memory-region = <&pil_gpu_mem>;
 	};
 
 	msm_bus: qcom,kgsl-busmon{
@@ -46,9 +47,12 @@
 		label = "kgsl-3d0";
 		compatible = "qcom,kgsl-3d0", "qcom,kgsl-3d";
 		status = "ok";
-		reg = <0x5000000 0x40000
-			0x780000 0x6300>;
-		reg-names = "kgsl_3d0_reg_memory", "qfprom_memory";
+		reg =   <0x5000000 0x40000>,
+			<0x5061000 0x800>,
+			<0x780000 0x6300>;
+		reg-names =     "kgsl_3d0_reg_memory",
+				"kgsl_3d0_cx_dbgc_memory",
+				"qfprom_memory";
 		interrupts = <0 300 0>;
 		interrupt-names = "kgsl_3d0_irq";
 		qcom,id = <0>;
@@ -58,6 +62,7 @@
 		qcom,initial-pwrlevel = <3>;
 
 		qcom,gpu-quirk-hfi-use-reg;
+		qcom,gpu-quirk-limit-uche-gbif-rw;
 
 		/* <HZ/12> */
 		qcom,idle-timeout = <80>;
@@ -117,7 +122,7 @@
 		cache-slices = <&llcc 12>, <&llcc 11>;
 
 		/* CPU latency parameter */
-		qcom,pm-qos-active-latency = <914>;
+		qcom,pm-qos-active-latency = <899>;
 		qcom,pm-qos-wakeup-latency = <899>;
 
 		/* Enable context aware freq. scaling */
@@ -133,6 +138,8 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			compatible = "qcom,gpu-coresight";
+
+			status = "disabled";
 
 			qcom,gpu-coresight@0 {
 				reg = <0>;
